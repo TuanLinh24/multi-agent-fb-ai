@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+transformers
+torch
+accelerate
+sentence-transformers
+faiss-cpu
+neo4j
+redis
+python-dotenv
+sse-starlette
+rank-bm25
+numpy
+pandas
+httpx
