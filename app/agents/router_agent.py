@@ -1,18 +1,55 @@
-from app.serving.llm_client import generate
-from app.agents.prompts import ROUTER_PROMPT
-from app.utils.json_parser import parse_router_output
+from typing import Literal
 
-async def route_query(query: str):
 
-    prompt = f"""
-{ROUTER_PROMPT}
+Intent = Literal[
+    "faq",
+    "consultant",
+    "order",
+    "ignore"
+]
 
-User:
-{query}
-"""
 
-    output = await generate(prompt, 20)
+async def route_query(query: str) -> Intent:
 
-    result = parse_router_output(output)
+    q = query.lower()
 
-    return result["action"]
+    # FAQ
+    faq_keywords = [
+        "wifi",
+        "đóng cửa",
+        "mở cửa",
+        "giao hàng",
+        "đậu xe",
+        "password"
+    ]
+
+    # CONSULTANT
+    consultant_keywords = [
+        "recommend",
+        "gợi ý",
+        "món ngon",
+        "uống gì",
+        "best seller",
+        "ngon"
+    ]
+
+    # ORDER
+    order_keywords = [
+        "đặt",
+        "mua",
+        "cho tôi",
+        "order",
+        "1 ly",
+        "2 ly"
+    ]
+
+    if any(x in q for x in faq_keywords):
+        return "faq"
+
+    if any(x in q for x in consultant_keywords):
+        return "consultant"
+
+    if any(x in q for x in order_keywords):
+        return "order"
+
+    return "ignore"

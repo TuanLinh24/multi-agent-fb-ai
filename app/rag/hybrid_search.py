@@ -1,43 +1,46 @@
-import faiss
 import numpy as np
+
 from app.rag.embeddings import embed_text
+from app.rag.vector_store import load_index
+from app.rag.reranker import rerank
 
-DOCUMENTS = []
-INDEX = None
+
+index, documents = load_index()
 
 
-def build_index(texts):
+def hybrid_search(query, top_k=5):
 
-    global INDEX
-    global DOCUMENTS
+    if index is None:
+        return None
 
-    DOCUMENTS = texts
+    query_embedding = embed_text(query)
 
-    embeddings = embed_text(texts)
-
-    embeddings = np.array(
-        embeddings,
+    query_embedding = np.array(
+        query_embedding,
         dtype=np.float32
     )
 
-    dim = embeddings.shape[1]
+    distances, indices = index.search(
+        query_embedding,
+        top_k
+    )
 
-    INDEX = faiss.IndexFlatL2(dim)
-
-    INDEX.add(embeddings)
-
-
-def search(query, top_k=3):
-
-    q = embed_text([query])
-
-    q = np.array(q, dtype=np.float32)
-
-    distances, indices = INDEX.search(q, top_k)
-
-    results = []
+    retrieved_docs = []
 
     for idx in indices[0]:
-        results.append(DOCUMENTS[idx])
 
-    return results
+        if idx < len(documents):
+
+            retrieved_docs.append(
+                documents[idx]
+            )
+
+    if not retrieved_docs:
+        return None
+
+    best_doc = rerank(
+        query,
+        retrieved_docs
+    )
+
+    return best_doc

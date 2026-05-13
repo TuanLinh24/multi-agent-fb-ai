@@ -1,34 +1,45 @@
 import pandas as pd
-from app.rag.neo4j_client import Neo4jClient
-from app.rag.hybrid_search import build_index
+import numpy as np
+import faiss
 
-neo = Neo4jClient()
-
-
-def ingest_menu():
-
-    df = pd.read_csv("data/menu.csv")
-
-    for _, row in df.iterrows():
-
-        neo.create_menu_item({
-            "name": row["name"],
-            "price": int(row["price"]),
-            "category": row["category"],
-            "description": row["description"]
-        })
+from app.rag.embeddings import embed_text
+from app.rag.vector_store import save_index
 
 
 def ingest_faq():
 
     df = pd.read_csv("data/faq.csv")
 
-    docs = []
+    questions = df["question"].tolist()
 
-    for _, row in df.iterrows():
+    embeddings = []
 
-        docs.append(
-            f"Q: {row['question']} A: {row['answer']}"
-        )
+    metadata = []
 
-    build_index(docs)
+    for idx, row in df.iterrows():
+
+        vector = embed_text(
+            row["question"]
+        )[0]
+
+        embeddings.append(vector)
+
+        metadata.append({
+            "question": row["question"],
+            "answer": row["answer"]
+        })
+
+    embeddings = np.array(
+        embeddings,
+        dtype=np.float32
+    )
+
+    dimension = embeddings.shape[1]
+
+    index = faiss.IndexFlatL2(dimension)
+
+    index.add(embeddings)
+
+    save_index(index, metadata)
+
+    print("FAQ ingestion completed.")
