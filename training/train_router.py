@@ -3,7 +3,9 @@ from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
     TrainingArguments,
-    BitsAndBytesConfig
+    Trainer,
+    BitsAndBytesConfig,
+    DataCollatorForLanguageModeling
 )
 
 from peft import (
@@ -11,8 +13,6 @@ from peft import (
     get_peft_model,
     prepare_model_for_kbit_training
 )
-
-from trl import SFTTrainer
 
 from training.router_sft_dataset import get_dataset
 
@@ -83,28 +83,29 @@ model = get_peft_model(model, lora_config)
 
 dataset = get_dataset()
 
-def format_example(example):
-    return example['text']
-
+def tokenize_function(example):
+    return tokenizer(example["text"], truncation=True, max_length=256)
 
 train_texts = [
-    {"text": format_example(x)}
-    for x in dataset
+    {"text": item}
+    for item in dataset
 ]
 
 train_dataset = Dataset.from_list(train_texts)
+tokenized_dataset = train_dataset.map(tokenize_function)
+
+data_collator = DataCollatorForLanguageModeling(
+    tokenizer=tokenizer,
+    mlm=False,
+)
 
 
 # =========================
 # TRAINING
 # =========================
 
-trainer = SFTTrainer(
+trainer = Trainer(
     model=model,
-    train_dataset=train_dataset,
-    dataset_text_field="text",
-    tokenizer=tokenizer,
-    max_seq_length=256,
     args=TrainingArguments(
         output_dir="./router_model",
 
@@ -126,6 +127,8 @@ trainer = SFTTrainer(
 
         report_to="none"
     ),
+    train_dataset=tokenized_dataset,
+    data_collator=data_collator,
 )
 
 trainer.train()

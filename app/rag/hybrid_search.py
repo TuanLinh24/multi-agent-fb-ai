@@ -1,43 +1,104 @@
 import numpy as np
+from typing import List, Dict, Any
 
 from app.rag.embeddings import embed_text_async
-from app.rag.vector_store import load_index
-from app.rag.reranker import rerank
-from app.graph.menu_graph import graph_expand
+from app.rag.neo4j_client import Neo4jClient
+from app.rag.reranker import rerank_async
 
 
-index, documents = load_index()
+class HybridSearch:
+    def __init__(self):
+        self.neo4j_client = Neo4jClient()
+
+    async def vector_search(self, query: str, top_k: int = 10) -> List[Dict[str, Any]]:
+        """Perform vector search on chunks"""
+        query_embedding = await embed_text_async(query)
+
+        # Search in chunk vector index
+        results = self.neo4j_client.vector_search(
+            index_name="chunk_vector_index",
+            query_embedding=query_embedding,
+            top_k=top_k
+        )
+
+        # Convert to dict format
+        docs = []
+        for node, score in results:
+            docs.append({
+                "id": node.id,
+                "text": node.get("text", ""),
+                "score": score,
+                "type": "vector"
+            })
+
+        return docs
+
+    async def graph_expand(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+        """Expand search using graph relationships"""
+        # Find relevant entities first via vector search on entities
+        query_embedding = await embed_text_async(query)
+
+        entity_results = self.neo4j_client.vector_search(
+            index_name="entity_vector_index",
+            query_embedding=query_embedding,
+            top_k=3  # Fewer entities for expansion
+        )
+
+        expanded_docs = []
+        for entity_node, _ in entity_results:
+            entity_name = entity_node.get("name", "")
+
+            # Get related chunks via MENTIONS relationships
+            related_chunks = self.neo4j_client.get_related_chunks(entity_name)
+
+            for chunk in related_chunks[:2]:  # Limit per entity
+                expanded_docs.append({
+                    "id": chunk.id,
+                    "text": chunk.get("text", ""),
+                    "score": 0.8,  # Lower score for graph expansion
+                    "type": "graph"
+                })
+
+        return expanded_docs[:top_k]
+
+    async def hybrid_search(self, query: str, top_k: int = 5) -> Dict[str, Any]:
+        """Perform hybrid search combining vector and graph-based retrieval"""
+        # Get vector search results
+        vector_docs = await self.vector_search(query, top_k=top_k*2)
+
+        # Get graph expansion results
+        graph_docs = await self.graph_expand(query, top_k=top_k//2)
+
+        # Combine candidates
+        candidates = vector_docs + graph_docs
+
+        if not candidates:
+            return {"text": "", "score": 0.0}
+
+        # Convert to format expected by reranker
+        reranker_docs = []
+        for doc in candidates:
+            reranker_docs.append({
+                "question": doc["text"],  # reranker expects "question" field
+                "text": doc["text"],
+                "score": doc["score"],
+                "type": doc["type"]
+            })
+
+        # Rerank to get best result
+        best_doc = await rerank_async(query, reranker_docs, top_k=1)
+
+        return {
+            "text": best_doc["text"],
+            "score": best_doc["score"],
+            "type": best_doc.get("type", "unknown")
+        }
 
 
-async def hybrid_search(query, top_k=5):
-    if index is None:
-        return []
-
-    query_embedding = await embed_text_async(query)
-    query_embedding = np.array(
-        query_embedding,
-        dtype=np.float32
-    )
-
-    distances, indices = index.search(
-        query_embedding,
-        top_k
-    )
-
-    retrieved_docs = []
-    for idx in indices[0]:
-        if idx < len(documents):
-            retrieved_docs.append(documents[idx])
-
-    graph_docs = graph_expand(query)
-    candidates = retrieved_docs + graph_docs
-
-    if not candidates:
-        return []
-
-    best_doc = rerank(query, candidates)
-    return best_doc
+# Global instance
+hybrid_search = HybridSearch()
 
 
-async def search(query, top_k=5):
-    return await hybrid_search(query, top_k)
+async def search(query: str, top_k: int = 5) -> Dict[str, Any]:
+    """Main search function"""
+    return await hybrid_search.hybrid_search(query, top_k)
