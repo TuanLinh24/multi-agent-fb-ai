@@ -1,23 +1,15 @@
-from sse_starlette.sse import EventSourceResponse
 import asyncio
 
 
-async def fake_token_stream(text: str):
+async def stream_text(text: str):
 
     words = text.split()
 
     for word in words:
 
-        yield {
-            "event": "message",
-            "data": word + " "
-        }
+        yield (
+            f"event: message\n"
+            f"data: {word}\n\n"
+        )
 
-        await asyncio.sleep(0.03)
-
-
-async def stream_response(text: str):
-
-    return EventSourceResponse(
-        fake_token_stream(text)
-    )
+        await asyncio.sleep(0)

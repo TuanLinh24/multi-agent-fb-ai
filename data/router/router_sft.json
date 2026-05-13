@@ -1,0 +1,38 @@
+[
+  {
+    "text": "\n### Instruction:\nYou are a routing classifier for a coffee shop AI system.\nClassify the user request into exactly one action.\nPossible actions: order, consultant, faq, ignore.\nSupport Vietnamese and English inputs.\nReturn only the label in the output.\n\n### Input:\nCho tôi 1 bạc xỉu\n\n### Output:\norder\n"
+  },
+  {
+    "text": "\n### Instruction:\nYou are a routing classifier for a coffee shop AI system.\nClassify the user request into exactly one action.\nPossible actions: order, consultant, faq, ignore.\nSupport Vietnamese and English inputs.\nReturn only the label in the output.\n\n### Input:\nI want a cappuccino\n\n### Output:\norder\n"
+  },
+  {
+    "text": "\n### Instruction:\nYou are a routing classifier for a coffee shop AI system.\nClassify the user request into exactly one action.\nPossible actions: order, consultant, faq, ignore.\nSupport Vietnamese and English inputs.\nReturn only the label in the output.\n\n### Input:\n1 latte đá nhé\n\n### Output:\norder\n"
+  },
+  {
+    "text": "\n### Instruction:\nYou are a routing classifier for a coffee shop AI system.\nClassify the user request into exactly one action.\nPossible actions: order, consultant, faq, ignore.\nSupport Vietnamese and English inputs.\nReturn only the label in the output.\n\n### Input:\nWhat do you recommend today?\n\n### Output:\nconsultant\n"
+  },
+  {
+    "text": "\n### Instruction:\nYou are a routing classifier for a coffee shop AI system.\nClassify the user request into exactly one action.\nPossible actions: order, consultant, faq, ignore.\nSupport Vietnamese and English inputs.\nReturn only the label in the output.\n\n### Input:\nCó món nào ngon không?\n\n### Output:\nconsultant\n"
+  },
+  {
+    "text": "\n### Instruction:\nYou are a routing classifier for a coffee shop AI system.\nClassify the user request into exactly one action.\nPossible actions: order, consultant, faq, ignore.\nSupport Vietnamese and English inputs.\nReturn only the label in the output.\n\n### Input:\nWifi password là gì?\n\n### Output:\nfaq\n"
+  },
+  {
+    "text": "\n### Instruction:\nYou are a routing classifier for a coffee shop AI system.\nClassify the user request into exactly one action.\nPossible actions: order, consultant, faq, ignore.\nSupport Vietnamese and English inputs.\nReturn only the label in the output.\n\n### Input:\nWhat time do you close?\n\n### Output:\nfaq\n"
+  },
+  {
+    "text": "\n### Instruction:\nYou are a routing classifier for a coffee shop AI system.\nClassify the user request into exactly one action.\nPossible actions: order, consultant, faq, ignore.\nSupport Vietnamese and English inputs.\nReturn only the label in the output.\n\n### Input:\nhaha\n\n### Output:\nignore\n"
+  },
+  {
+    "text": "\n### Instruction:\nYou are a routing classifier for a coffee shop AI system.\nClassify the user request into exactly one action.\nPossible actions: order, consultant, faq, ignore.\nSupport Vietnamese and English inputs.\nReturn only the label in the output.\n\n### Input:\nhello\n\n### Output:\nignore\n"
+  },
+  {
+    "text": "\n### Instruction:\nYou are a routing classifier for a coffee shop AI system.\nClassify the user request into exactly one action.\nPossible actions: order, consultant, faq, ignore.\nSupport Vietnamese and English inputs.\nReturn only the label in the output.\n\n### Input:\nờm...\n\n### Output:\nignore\n"
+  },
+  {
+    "text": "\n### Instruction:\nYou are a routing classifier for a coffee shop AI system.\nClassify the user request into exactly one action.\nPossible actions: order, consultant, faq, ignore.\nSupport Vietnamese and English inputs.\nReturn only the label in the output.\n\n### Input:\nCó món nào ngon rẻ không?\n\n### Output:\nconsultant\n"
+  },
+  {
+    "text": "\n### Instruction:\nYou are a routing classifier for a coffee shop AI system.\nClassify the user request into exactly one action.\nPossible actions: order, consultant, faq, ignore.\nSupport Vietnamese and English inputs.\nReturn only the label in the output.\n\n### Input:\nTôi muốn uống gì đó ít ngọt\n\n### Output:\nconsultant\n"
+  }
+]

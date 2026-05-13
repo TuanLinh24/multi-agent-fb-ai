@@ -1,32 +1,38 @@
 import time
+from collections import defaultdict
 
-class SessionStore:
+sessions = defaultdict(list)
+last_updated = {}
 
-    def __init__(self):
+MAX_HISTORY = 5
+SESSION_TTL_SECONDS = 3600
 
-        self.sessions = {}
-        self.ttl = 1800
 
-    def get_history(self, session_id):
+def _cleanup():
+    now = time.time()
+    expired = [
+        session_id
+        for session_id, updated_at in last_updated.items()
+        if now - updated_at > SESSION_TTL_SECONDS
+    ]
+    for session_id in expired:
+        sessions.pop(session_id, None)
+        last_updated.pop(session_id, None)
 
-        if session_id not in self.sessions:
-            return []
 
-        return self.sessions[session_id]["history"][-5:]
+def add_message(session_id, role, content):
+    _cleanup()
+    sessions[session_id].append({
+        "role": role,
+        "content": content,
+        "timestamp": time.time()
+    })
+    last_updated[session_id] = time.time()
 
-    def add_message(self, session_id, user, assistant):
+    if len(sessions[session_id]) > MAX_HISTORY:
+        sessions[session_id] = sessions[session_id][-MAX_HISTORY:]
 
-        now = time.time()
 
-        if session_id not in self.sessions:
-            self.sessions[session_id] = {
-                "history": [],
-                "updated_at": now
-            }
-
-        self.sessions[session_id]["history"].append({
-            "user": user,
-            "assistant": assistant
-        })
-
-        self.sessions[session_id]["updated_at"] = now
+def get_history(session_id):
+    _cleanup()
+    return sessions[session_id]

@@ -1,6 +1,7 @@
 from transformers import AutoTokenizer
 from transformers import AutoModelForCausalLM
 
+import asyncio
 import torch
 
 
@@ -13,13 +14,34 @@ tokenizer = AutoTokenizer.from_pretrained(
 
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_NAME,
-    torch_dtype="auto",
+    torch_dtype=torch.float16,
     device_map="auto"
 )
 
+model.eval()
+
+
+def _generate_blocking(text: str) -> str:
+    model_inputs = tokenizer(
+        [text],
+        return_tensors="pt"
+    ).to(model.device)
+
+    with torch.inference_mode():
+        generated_ids = model.generate(
+            **model_inputs,
+            max_new_tokens=12,
+            temperature=0.1,
+            do_sample=False,
+            pad_token_id=tokenizer.eos_token_id
+        )
+
+    output_ids = generated_ids[0][len(model_inputs.input_ids[0]):]
+
+    return tokenizer.decode(output_ids, skip_special_tokens=True).strip()
+
 
 async def generate(prompt: str):
-
     messages = [
         {
             "role": "system",
@@ -40,24 +62,4 @@ async def generate(prompt: str):
         add_generation_prompt=True
     )
 
-    model_inputs = tokenizer(
-        [text],
-        return_tensors="pt"
-    ).to(model.device)
-
-    generated_ids = model.generate(
-        **model_inputs,
-        max_new_tokens=32,
-        temperature=0.1,
-        do_sample=False
-    )
-
-    output_ids = generated_ids[0][
-        len(model_inputs.input_ids[0]):]
-
-    response = tokenizer.decode(
-        output_ids,
-        skip_special_tokens=True
-    )
-
-    return response
+    return await asyncio.to_thread(_generate_blocking, text)

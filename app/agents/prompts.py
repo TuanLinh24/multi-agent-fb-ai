@@ -7,7 +7,8 @@ Possible intents:
 - faq
 - ignore
 
-Return JSON only.
+Support Vietnamese and English input.
+Return valid JSON only with the field "action".
 
 Example:
 {"action":"order"}

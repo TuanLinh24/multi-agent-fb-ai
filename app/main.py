@@ -1,15 +1,27 @@
+import asyncio
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+
 from pydantic import BaseModel
 
 from app.agents.router_agent import route_query
-from app.rag.retriever import retrieve_faq
-from app.serving.llm_client import generate
-from app.serving.stream import stream_response
-from fastapi.middleware.cors import CORSMiddleware
-from app.rag.retriever import retrieve_faq
-from app.rag.hybrid_search import hybrid_search
+from app.agents.faq_agent import handle_faq
+from app.agents.consultant_agent import handle_consultant
+from app.agents.order_agent import handle_order
+
+from app.cache.session_store import (
+    add_message,
+    get_history
+)
+
+from app.serving.stream import stream_text
+
 
 app = FastAPI()
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,97 +30,47 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class ChatRequest(BaseModel):
+
     session_id: str
+
     message: str
 
 
 @app.post("/chat")
 async def chat(payload: ChatRequest):
 
+    add_message(
+        payload.session_id,
+        "user",
+        payload.message
+    )
+
     intent = await route_query(payload.message)
+    history = get_history(payload.session_id)
 
-    # FAQ AGENT
     if intent == "faq":
-
-        faq = hybrid_search(payload.message)
-
-        if faq:
-
-            prompt = f"""
-Rewrite this answer naturally in Vietnamese.
-
-Answer:
-{faq["answer"]}
-
-Keep the meaning exactly the same.
-Reply in one short sentence only.
-"""
-
-            response = await generate(prompt)
-
-            response = response.replace(
-                "Answer:",
-                ""
-            ).strip()
-
-            response = response.split("\n")[0]
-
-            response = f"{response}"
-
-        else:
-
-            response = "Tôi không tìm thấy thông tin phù hợp."
-
-    # CONSULTANT AGENT
+        response = await handle_faq(payload.message, history)
     elif intent == "consultant":
-
-        prompt = f"""
-You are a coffee consultant assistant.
-
-Recommend drinks naturally in Vietnamese.
-
-User Question:
-{payload.message}
-
-Recommendation:
-"""
-
-        response = await generate(prompt)
-
-        response = response.replace(
-            "Recommendation:",
-            ""
-        ).strip()
-
-        response = response.split("\n")[0]
-
-    # ORDER AGENT
+        response = await handle_consultant(payload.message, history)
     elif intent == "order":
-
-        prompt = f"""
-You are an order assistant.
-
-Confirm the customer order politely in Vietnamese.
-
-User Request:
-{payload.message}
-
-Order Confirmation:
-"""
-
-        response = await generate(prompt)
-
-        response = response.replace(
-            "Order Confirmation:",
-            ""
-        ).strip()
-
-        response = response.split("\n")[0]
-
-    # FALLBACK
+        response = await handle_order(payload.message, history)
     else:
+        response = (
+            "Sorry, I do not "
+            "understand your request."
+        )
 
-        response = "Xin lỗi, tôi chưa hiểu yêu cầu của bạn."
+    add_message(
+        payload.session_id,
+        "assistant",
+        response
+    )
 
-    return await stream_response(response)
+    print(get_history(payload.session_id))
+
+    return StreamingResponse(
+        stream_text(response),
+        media_type="text/event-stream"
+    )

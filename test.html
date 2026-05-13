@@ -7,7 +7,7 @@
 Send
 </button>
 
-<pre id="output"></pre>
+<p id="output"></p>
 
 <script>
 
@@ -18,33 +18,57 @@ async function send() {
         {
             method: "POST",
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type":
+                "application/json"
             },
             body: JSON.stringify({
                 session_id: "1",
-                message: "Password wifi quán?"
+                message:
+                "Bạn có thể đề xuất cho tôi một đồ uống được không?"
             })
         }
-    )
+    );
 
-    const reader = response.body.getReader()
+    const reader =
+        response.body.getReader();
 
-    const decoder = new TextDecoder()
+    const decoder = new TextDecoder();
+
+    let finalText = "";
 
     while (true) {
 
-        const { done, value } = await reader.read()
+        const { done, value } =
+            await reader.read();
 
-        if (done) break
+        if (done) break;
 
-        const chunk = decoder.decode(value)
+        const chunk =
+            decoder.decode(value);
 
-        document.getElementById("output").textContent += chunk
+        const matches =
+            chunk.match(/data: (.*)/g);
+
+        if (matches) {
+
+            matches.forEach(m => {
+
+                finalText +=
+                    m.replace("data: ", "")
+                    + " ";
+
+            });
+
+            document
+                .getElementById(
+                    "output"
+                )
+                .innerText = finalText;
+        }
     }
 }
 
 </script>
 
 </body>
-
 </html>
