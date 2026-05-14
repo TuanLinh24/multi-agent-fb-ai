@@ -75,23 +75,13 @@ class HybridSearch:
         if not candidates:
             return {"text": "", "score": 0.0}
 
-        # Convert to format expected by reranker
-        reranker_docs = []
-        for doc in candidates:
-            reranker_docs.append({
-                "question": doc["text"],  # reranker expects "question" field
-                "text": doc["text"],
-                "score": doc["score"],
-                "type": doc["type"]
-            })
-
-        # Rerank to get best result
-        best_doc = await rerank_async(query, reranker_docs, top_k=1)
+        # For now, just return the first result (skip reranking due to model issues)
+        best_doc = candidates[0]
 
         return {
             "text": best_doc["text"],
             "score": best_doc["score"],
-            "type": best_doc.get("type", "unknown")
+            "type": best_doc["type"]
         }
 
 

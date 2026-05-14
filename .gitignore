@@ -1,0 +1,19 @@
+# Môi trường ảo
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Dữ liệu và Models (theo yêu cầu mã đề MAS-LLM-2026-FINAL)
+# Chỉ nên push code, không push trọng số model nặng hàng GB
+models/
+*.safetensors
+*.bin
+*.pth
+
+# IDE
+.vscode/
+.idea/
