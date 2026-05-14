@@ -1,9 +1,16 @@
 from neo4j import GraphDatabase
+from neo4j.exceptions import Neo4jError
 from app.config import (
     NEO4J_URI,
     NEO4J_USER,
     NEO4J_PASSWORD
 )
+
+VECTOR_INDEX_CONFIGS = {
+    "menu_vector_index": ("MenuItem", "embedding"),
+    "chunk_vector_index": ("Chunk", "embedding"),
+    "entity_vector_index": ("Entity", "embedding"),
+}
 
 class Neo4jClient:
 
@@ -112,8 +119,32 @@ class Neo4jClient:
                 menu_name=menu_name, category_name=category_name
             )
 
-    def create_vector_index(self, index_name, node_label, property_name):
-        """Create vector index for semantic search"""
+    def show_indexes(self):
+        """Return all indexes from Neo4j."""
+        with self.driver.session() as session:
+            return list(session.run("SHOW INDEXES"))
+
+    def resolve_vector_index_name(self, index_name, node_label, property_name):
+        """Find the actual vector index name by configured name or label/property match."""
+        for record in self.show_indexes():
+            if record["type"] != "VECTOR":
+                continue
+            if record["name"] == index_name:
+                return index_name
+            if record["labelsOrTypes"] == [node_label] and record["properties"] == [property_name]:
+                return record["name"]
+        return None
+
+    def drop_index(self, index_name):
+        """Drop an index by name if it exists."""
+        with self.driver.session() as session:
+            session.run(f"DROP INDEX {index_name} IF EXISTS")
+
+    def get_or_create_vector_index_name(self, index_name, node_label, property_name, dimensions=768):
+        actual_name = self.resolve_vector_index_name(index_name, node_label, property_name)
+        if actual_name:
+            return actual_name
+
         with self.driver.session() as session:
             session.run(
                 f"""
@@ -121,25 +152,74 @@ class Neo4jClient:
                 FOR (n:{node_label}) ON (n.{property_name})
                 OPTIONS {{
                     indexConfig: {{
-                        `vector.dimensions`: 768,
+                        `vector.dimensions`: {dimensions},
                         `vector.similarity_function`: 'cosine'
                     }}
                 }}
                 """
             )
 
+        actual_name = self.resolve_vector_index_name(index_name, node_label, property_name)
+        return actual_name or index_name
+
+    def create_vector_index(self, index_name, node_label, property_name, dimensions=768):
+        """Create vector index for semantic search"""
+        return self.get_or_create_vector_index_name(index_name, node_label, property_name, dimensions=dimensions)
+
     def vector_search(self, index_name, query_embedding, top_k=5):
         """Perform vector search"""
+        actual_name = None
+        node_label = None
+        property_name = None
+
+        if index_name in VECTOR_INDEX_CONFIGS:
+            node_label, property_name = VECTOR_INDEX_CONFIGS[index_name]
+            actual_name = self.resolve_vector_index_name(index_name, node_label, property_name)
+
+        if not actual_name:
+            actual_name = index_name
+
+        print(f"[DEBUG] vector_search index_name={index_name}, actual_name={actual_name}, query_len={len(query_embedding)}")
+
         with self.driver.session() as session:
-            result = session.run(
-                f"""
-                CALL db.index.vector.queryNodes('{index_name}', $top_k, $query_embedding)
-                YIELD node, score
-                RETURN node, score
-                """,
-                top_k=top_k, query_embedding=query_embedding
-            )
-            return [(record["node"], record["score"]) for record in result]
+            try:
+                result = session.run(
+                    f"""
+                    CALL db.index.vector.queryNodes('{actual_name}', $top_k, $query_embedding)
+                    YIELD node, score
+                    RETURN node, score
+                    """,
+                    top_k=top_k, query_embedding=query_embedding
+                )
+                return [(record["node"], record["score"]) for record in result]
+            except Neo4jError as exc:
+                message = str(exc).lower()
+                print(f"[DEBUG] vector_search neo4j error: {message}")
+                if index_name in VECTOR_INDEX_CONFIGS:
+                    if "no such vector schema index" in message or "schema index" in message or "index query vector has" in message:
+                        dimensions = len(query_embedding)
+                        node_label, property_name = VECTOR_INDEX_CONFIGS[index_name]
+                        actual_name = self.resolve_vector_index_name(index_name, node_label, property_name)
+                        print(f"[DEBUG] resolve_vector_index_name returned {actual_name}")
+                        if actual_name:
+                            self.drop_index(actual_name)
+                        actual_name = self.create_vector_index(
+                            index_name,
+                            node_label,
+                            property_name,
+                            dimensions=dimensions,
+                        )
+                        print(f"[DEBUG] recreated index name={actual_name}, dimensions={dimensions}")
+                        result = session.run(
+                            f"""
+                            CALL db.index.vector.queryNodes('{actual_name}', $top_k, $query_embedding)
+                            YIELD node, score
+                            RETURN node, score
+                            """,
+                            top_k=top_k, query_embedding=query_embedding
+                        )
+                        return [(record["node"], record["score"]) for record in result]
+                raise
 
     def get_adjacent_chunks(self, chunk_id, direction="both"):
         """Get adjacent chunks via NEXT relationships"""

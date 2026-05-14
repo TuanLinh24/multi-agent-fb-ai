@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent Coffee Shop Chat Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 800px;
+            height: 90vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .chat-header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .chat-header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .agents-info {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .agent-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            position: relative;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-left: auto;
+        }
+
+        .message.assistant .message-content {
+            background: white;
+            color: #333;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .message.agent-info {
+            justify-content: center;
+            margin: 10px 0;
+        }
+
+        .message.agent-info .message-content {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+            color: #333;
+            font-size: 12px;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-weight: bold;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+        }
+
+        .typing-indicator.show {
+            display: block;
+        }
+
+        .chat-input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            outline: none;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .chat-input:focus {
+            border-color: #667eea;
+        }
+
+        .send-button {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: transform 0.2s ease;
+        }
+
+        .send-button:hover {
+            transform: scale(1.05);
+        }
+
+        .send-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .demo-buttons {
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .demo-btn {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            color: #333;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: transform 0.2s ease;
+        }
+
+        .demo-btn:hover {
+            transform: scale(1.05);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .streaming {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        .token-counter {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: none;
+        }
+
+        .performance-info {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-size: 12px;
+            max-width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>☕ Multi-Agent Coffee Shop</h1>
+            <p>Demo: Multi-turn conversation with AI agents</p>
+            <div class="agents-info">
+                <span class="agent-badge">🤖 Router Agent</span>
+                <span class="agent-badge">❓ FAQ Agent</span>
+                <span class="agent-badge">💬 Consultant Agent</span>
+                <span class="agent-badge">🛒 Order Agent</span>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="message assistant">
+                <div class="message-content">
+                    <strong>👋 Chào mừng đến với Highlands Coffee!</strong><br>
+                    Tôi là trợ lý AI đa tác tử. Hãy hỏi tôi về menu, đặt hàng, hoặc bất kỳ câu hỏi nào về quán coffee nhé!<br><br>
+                    <em>💡 Mẹo: Hãy thử các câu hỏi khác nhau để thấy các agents khác nhau hoạt động!</em>
+                </div>
+            </div>
+        </div>
+
+        <div class="typing-indicator" id="typingIndicator">
+            <span>AI đang suy nghĩ...</span>
+        </div>
+
+        <div class="chat-input-container">
+            <input type="text" class="chat-input" id="chatInput" placeholder="Nhập tin nhắn của bạn...">
+            <button class="send-button" id="sendButton">Gửi</button>
+        </div>
+
+        <div class="demo-buttons">
+            <button class="demo-btn" onclick="sendDemoMessage('Wifi là gì?')">❓ Hỏi FAQ</button>
+            <button class="demo-btn" onclick="sendDemoMessage('Các loại coffee của quán?')">☕ Hỏi menu</button>
+            <button class="demo-btn" onclick="sendDemoMessage('Tôi muốn đặt 2 ly latte')">🛒 Đặt hàng</button>
+            <button class="demo-btn" onclick="sendDemoMessage('Quán có chỗ ngồi ngoài trời không?')">💺 Hỏi tiện ích</button>
+        </div>
+    </div>
+
+    <div class="token-counter" id="tokenCounter"></div>
+    <div class="performance-info" id="performanceInfo">
+        <div>TTFT: -- ms</div>
+        <div>Tokens: --</div>
+        <div>Throughput: -- tok/s</div>
+    </div>
+
+    <script>
+        class ChatDemo {
+            constructor() {
+                this.sessionId = this.generateSessionId();
+                this.currentAgent = null;
+                this.messageCount = 0;
+                this.totalTokens = 0;
+                this.setupEventListeners();
+            }
+
+            generateSessionId() {
+                return 'demo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            }
+
+            setupEventListeners() {
+                const input = document.getElementById('chatInput');
+                const button = document.getElementById('sendButton');
+
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+
+                button.addEventListener('click', () => this.sendMessage());
+            }
+
+            addMessage(content, isUser = false, agentType = null) {
+                const messagesContainer = document.getElementById('chatMessages');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${isUser ? 'user' : 'assistant'}`;
+
+                if (agentType) {
+                    // Add agent info message
+                    const agentInfoDiv = document.createElement('div');
+                    agentInfoDiv.className = 'message agent-info';
+                    agentInfoDiv.innerHTML = `
+                        <div class="message-content">
+                            ${this.getAgentIcon(agentType)} ${this.getAgentName(agentType)} đang xử lý...
+                        </div>
+                    `;
+                    messagesContainer.appendChild(agentInfoDiv);
+                }
+
+                messageDiv.innerHTML = `
+                    <div class="message-content">
+                        ${content}
+                    </div>
+                `;
+
+                messagesContainer.appendChild(messageDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+                this.messageCount++;
+            }
+
+            getAgentIcon(agentType) {
+                const icons = {
+                    'router': '🎯',
+                    'faq': '❓',
+                    'consultant': '💬',
+                    'order': '🛒'
+                };
+                return icons[agentType] || '🤖';
+            }
+
+            getAgentName(agentType) {
+                const names = {
+                    'router': 'Router Agent',
+                    'faq': 'FAQ Agent',
+                    'consultant': 'Consultant Agent',
+                    'order': 'Order Agent'
+                };
+                return names[agentType] || 'AI Assistant';
+            }
+
+            async sendMessage() {
+                const input = document.getElementById('chatInput');
+                const message = input.value.trim();
+
+                if (!message) return;
+
+                // Add user message
+                this.addMessage(message, true);
+                input.value = '';
+
+                // Show typing indicator
+                this.showTyping(true);
+
+                try {
+                    const response = await this.callAPI(message);
+                    this.displayStreamingResponse(response);
+                } catch (error) {
+                    console.error('API Error:', error);
+                    this.addMessage('❌ Xin lỗi, có lỗi xảy ra. Vui lòng thử lại sau.');
+                } finally {
+                    this.showTyping(false);
+                }
+            }
+
+            async callAPI(message) {
+                const response = await fetch('http://localhost:8000/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        session_id: this.sessionId,
+                        message: message
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                return response;
+            }
+
+            async displayStreamingResponse(response) {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let currentMessage = '';
+                let tokenCount = 0;
+                let startTime = Date.now();
+                let firstTokenTime = null;
+
+                const messagesContainer = document.getElementById('chatMessages');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message assistant streaming';
+                messageDiv.innerHTML = '<div class="message-content"></div>';
+                messagesContainer.appendChild(messageDiv);
+
+                const contentDiv = messageDiv.querySelector('.message-content');
+
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop();
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const data = line.slice(6);
+                                if (data === '[DONE]') continue;
+
+                                try {
+                                    const event = JSON.parse(data);
+
+                                    if (event.token) {
+                                        currentMessage += event.token;
+                                        contentDiv.textContent = currentMessage;
+                                        tokenCount++;
+
+                                        if (firstTokenTime === null) {
+                                            firstTokenTime = Date.now() - startTime;
+                                        }
+
+                                        // Update token counter
+                                        this.updateTokenCounter(tokenCount);
+                                    }
+
+                                    if (event.event === 'complete') {
+                                        // Update performance info
+                                        const totalTime = Date.now() - startTime;
+                                        const throughput = tokenCount / (totalTime / 1000);
+                                        this.updatePerformanceInfo(firstTokenTime, tokenCount, throughput);
+                                        break;
+                                    }
+
+                                } catch (e) {
+                                    console.log('Parse error:', e);
+                                }
+                            }
+                        }
+                    }
+                } finally {
+                    messageDiv.classList.remove('streaming');
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+            }
+
+            showTyping(show) {
+                const indicator = document.getElementById('typingIndicator');
+                indicator.classList.toggle('show', show);
+            }
+
+            updateTokenCounter(count) {
+                const counter = document.getElementById('tokenCounter');
+                counter.textContent = `Tokens: ${count}`;
+                counter.style.display = 'block';
+            }
+
+            updatePerformanceInfo(ttft, tokens, throughput) {
+                const info = document.getElementById('performanceInfo');
+                info.innerHTML = `
+                    <div>TTFT: ${ttft}ms</div>
+                    <div>Tokens: ${tokens}</div>
+                    <div>Throughput: ${throughput.toFixed(1)} tok/s</div>
+                `;
+            }
+        }
+
+        // Demo message functions
+        function sendDemoMessage(message) {
+            document.getElementById('chatInput').value = message;
+            chatDemo.sendMessage();
+        }
+
+        // Initialize chat when page loads
+        let chatDemo;
+        document.addEventListener('DOMContentLoaded', () => {
+            chatDemo = new ChatDemo();
+        });
+
+        // Add some demo conversation starters
+        setTimeout(() => {
+            chatDemo.addMessage(`
+                <strong>🎯 Demo Multi-turn Conversation:</strong><br>
+                • Hỏi FAQ: "Wifi là gì?"<br>
+                • Hỏi menu: "Các loại coffee của quán?"<br>
+                • Đặt hàng: "Tôi muốn đặt 2 ly latte"<br>
+                • Tư vấn: "Quán có chỗ ngồi ngoài trời không?"<br><br>
+                <em>Hãy thử các câu hỏi khác nhau để thấy Router Agent phân loại và chuyển đến agent phù hợp!</em>
+            `);
+        }, 2000);
+    </script>
+</body>
+</html>

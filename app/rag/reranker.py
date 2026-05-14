@@ -1,10 +1,17 @@
-from sentence_transformers import CrossEncoder
 from app.queue.request_queue import run_with_queue
 
 # Using BGE Reranker v2 for cross-encoder reranking
 MODEL_NAME = "BAAI/bge-reranker-base"  # Using base model for compatibility
 
-reranker = CrossEncoder(MODEL_NAME)
+_reranker = None
+
+
+def _get_reranker():
+    global _reranker
+    if _reranker is None:
+        from sentence_transformers import CrossEncoder
+        _reranker = CrossEncoder(MODEL_NAME)
+    return _reranker
 
 
 def rerank(query: str, documents: list[dict], top_k: int = 1):
@@ -19,7 +26,7 @@ def rerank(query: str, documents: list[dict], top_k: int = 1):
     pairs = [[query, doc.get("question", doc.get("text", ""))] for doc in documents]
 
     # Get scores
-    scores = reranker.predict(pairs)
+    scores = _get_reranker().predict(pairs)
 
     # Sort by scores (higher is better for cross-encoder)
     ranked = list(zip(scores, documents))

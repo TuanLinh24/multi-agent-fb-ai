@@ -15,8 +15,9 @@ def setup_schema():
 
         # Create vector indexes
         print("Creating vector indexes...")
-        client.create_vector_index("menu_embedding", "MenuItem", "embedding")
-        client.create_vector_index("chunk_embedding", "Chunk", "embedding")
+        client.create_vector_index("menu_vector_index", "MenuItem", "embedding")
+        client.create_vector_index("chunk_vector_index", "Chunk", "embedding")
+        client.create_vector_index("entity_vector_index", "Entity", "embedding")
 
         print("Schema setup completed successfully!")
 

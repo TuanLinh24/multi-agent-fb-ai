@@ -2,7 +2,7 @@
 import json
 import re
 
-VALID_ACTIONS = {"order", "consultant", "faq", "ignore"}
+VALID_ACTIONS = {"order", "consultant", "faq", "greeting", "ignore"}
 
 
 def safe_parse_router_output(text: str):

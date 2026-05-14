@@ -7,25 +7,44 @@ Production LLM Client for vLLM / SGLang OpenAI-compatible server
 """
 
 import os
-import asyncio
 import json
+from pathlib import Path
 from typing import Any, Dict, AsyncGenerator, Optional
 from datetime import datetime
 
 import httpx
+from dotenv import load_dotenv
 
 from app.cache.semantic_cache import SemanticCache
 
+# Đảm bảo .env có hiệu lực dù import llm_client trước app.main (tests, worker khác).
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-# =========================
-# CONFIG
-# =========================
 
-VLLM_API_URL = os.getenv("VLLM_API_URL", "http://localhost:8001")
-MODEL_NAME = os.getenv("LLM_MODEL", "Qwen/Qwen2.5-1.5B-Instruct")
+def _ttft_budget() -> float:
+    return float(os.getenv("TTFT_BUDGET", "0.2"))
 
-TIMEOUT = float(os.getenv("LLM_TIMEOUT", "30"))
-TTFT_BUDGET = float(os.getenv("TTFT_BUDGET", "0.2"))  # 200ms target
+
+_DEFAULT_LLM_BASE = "http://127.0.0.1:8001"
+
+
+def _vllm_base_url_from_env() -> str:
+    """Đọc VLLM_API_URL; cắt phần dính nhầm khi copy .env (vd: ...8001(venv))."""
+    raw = (os.getenv("VLLM_API_URL") or _DEFAULT_LLM_BASE).strip()
+    if "(" in raw:
+        raw = raw.split("(", 1)[0].strip()
+    raw = raw.split()[0] if raw else _DEFAULT_LLM_BASE
+    raw = raw.split("#", 1)[0].strip()
+    return raw.rstrip("/") or _DEFAULT_LLM_BASE.rstrip("/")
+
+
+def _llm_model_from_env() -> str:
+    """Ưu tiên LLM_MODEL; nếu chỉ có MODEL_NAME trong .env thì dùng luôn."""
+    return (
+        os.getenv("LLM_MODEL")
+        or os.getenv("MODEL_NAME")
+        or "Qwen/Qwen2.5-1.5B-Instruct"
+    )
 
 
 # =========================
@@ -46,16 +65,18 @@ class LLMClient:
 
     def __init__(
         self,
-        api_url: str = VLLM_API_URL,
-        model_name: str = MODEL_NAME,
-        timeout: float = TIMEOUT,
+        api_url: Optional[str] = None,
+        model_name: Optional[str] = None,
+        timeout: Optional[float] = None,
     ):
-        self.api_url = api_url.rstrip("/")
-        self.model_name = model_name
-        self.timeout = timeout
+        self.api_url = (api_url or _vllm_base_url_from_env()).rstrip("/")
+        self.model_name = model_name or _llm_model_from_env()
+        self.timeout = (
+            timeout if timeout is not None else float(os.getenv("LLM_TIMEOUT", "30"))
+        )
 
         self.client = httpx.AsyncClient(
-            timeout=httpx.Timeout(timeout)
+            timeout=httpx.Timeout(self.timeout)
         )
 
     # -------------------------
@@ -102,7 +123,9 @@ class LLMClient:
             raise TimeoutError(f"LLM timeout after {self.timeout}s")
 
         except Exception as e:
-            raise RuntimeError(f"LLM request failed: {e}")
+            raise RuntimeError(
+                f"LLM request failed (POST {self.api_url}/v1/chat/completions): {e}"
+            )
 
     # =========================
     # NORMAL GENERATION
@@ -147,8 +170,9 @@ class LLMClient:
 
         # latency tracking
         elapsed = (datetime.now() - start).total_seconds()
-        if elapsed > TTFT_BUDGET:
-            print(f"[WARN] TTFT exceeded: {elapsed:.3f}s > {TTFT_BUDGET}s")
+        budget = _ttft_budget()
+        if elapsed > budget:
+            print(f"[WARN] TTFT exceeded: {elapsed:.3f}s > {budget}s")
 
         return text
 
@@ -221,7 +245,8 @@ class LLMClient:
                 f"Throughput={throughput:.1f} tok/s"
             )
 
-            if first_token_time > TTFT_BUDGET:
+            budget = _ttft_budget()
+            if first_token_time > budget:
                 print(f"[WARN] TTFT exceeded: {first_token_time:.3f}s")
 
 
@@ -230,12 +255,26 @@ class LLMClient:
 # =========================
 
 _llm_client: Optional[LLMClient] = None
+_llm_config_sig: Optional[tuple] = None
+
+
+def _llm_env_signature() -> tuple:
+    return (
+        _vllm_base_url_from_env(),
+        _llm_model_from_env(),
+        os.getenv("LLM_TIMEOUT", "30"),
+    )
 
 
 async def get_llm_client() -> LLMClient:
-    global _llm_client
-    if _llm_client is None:
-        _llm_client = LLMClient()
+    global _llm_client, _llm_config_sig
+    sig = _llm_env_signature()
+    if _llm_client is not None and _llm_config_sig == sig:
+        return _llm_client
+    if _llm_client is not None:
+        await _llm_client.close()
+    _llm_client = LLMClient()
+    _llm_config_sig = sig
     return _llm_client
 
 

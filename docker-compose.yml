@@ -1,0 +1,4 @@
+# Chạy từ thư mục gốc repo: docker compose up -d
+# Nội dung thật nằm trong docker/docker-compose.yml
+include:
+  - docker/docker-compose.yml

@@ -1,19 +1,12 @@
-from app.rag.hybrid_search import hybrid_search
+from app.rag.hybrid_search import search as hybrid_search
 from app.serving.llm_client import generate
+from app.agents.prompts import CONSULTANT_PROMPT
 
 MENU = [
-    {
-        "name": "Latte",
-        "description": "smooth milk coffee"
-    },
-    {
-        "name": "Cappuccino",
-        "description": "strong espresso with foam"
-    },
-    {
-        "name": "Mocha",
-        "description": "chocolate flavored coffee"
-    }
+    {"name": "Phin Sữa Đá", "description": "Cà phê phin pha sẵn, sữa đặc, đá."},
+    {"name": "Trà Sen Vàng", "description": "Trà ô long, hương sen."},
+    {"name": "Americano", "description": "Espresso pha loãng."},
+    {"name": "Freeze Trà Xanh", "description": "Đồ uống đá xay, trà xanh."},
 ]
 
 
@@ -28,25 +21,19 @@ def build_consultant_prompt(user_message, context_text=""):
         )
 
     prompt = f"""
-You are a coffee consultant assistant.
-Support Vietnamese and English.
+{CONSULTANT_PROMPT}
 
-Available drinks:
+Menu mẫu (chỉ giới thiệu món có trong danh sách; nếu Context RAG có món khác thì ưu tiên Context):
 
 {menu_text}
 
+Ngữ cảnh từ CSDL (nếu có):
 {context_text}
 
-User request:
+Yêu cầu của khách:
 {user_message}
 
-Rules:
-- Recommend ONLY drinks from menu
-- Keep answer under 2 sentences
-- Be friendly
-- Do not invent drinks
-
-Answer:
+Trả lời (tiếng Việt nếu khách dùng tiếng Việt):
 """
 
     return prompt
@@ -62,9 +49,16 @@ async def handle_consultant(user_message, history):
                 parts.append(best_doc["question"])
             if best_doc.get("answer"):
                 parts.append(best_doc["answer"])
-            context_text = "\n".join(parts)
+            if best_doc.get("text"):
+                parts.append(best_doc["text"])
+            context_text = "\n".join(parts).strip()
         else:
             context_text = str(best_doc)
 
     prompt = build_consultant_prompt(user_message, context_text)
-    return await generate(prompt)
+    try:
+        return await generate(prompt)
+    except RuntimeError:
+        if context_text:
+            return context_text
+        raise

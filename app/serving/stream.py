@@ -4,6 +4,7 @@ SSE streaming with performance monitoring
 """
 
 import asyncio
+import json
 import time
 from typing import AsyncGenerator
 
@@ -25,7 +26,7 @@ async def stream_text(text: str) -> AsyncGenerator[str, None]:
         # SSE format
         yield (
             f"event: token\n"
-            f"data: {token_data}\n\n"
+            f"data: {json.dumps(token_data)}\n\n"
         )
 
         # Small delay to simulate streaming
